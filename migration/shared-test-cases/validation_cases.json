@@ -1,0 +1,540 @@
+[
+  {
+    "name": "valid transfer",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": true,
+      "value": {
+        "source_account_id": "00000000-0000-4000-8000-000000000001",
+        "destination_account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_vnd": 150000,
+        "memo": "Demo transfer"
+      }
+    }
+  },
+  {
+    "name": "missing source_account_id",
+    "input": {
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "REQUIRED",
+      "field": "source_account_id"
+    }
+  },
+  {
+    "name": "missing destination_account_id",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "amount_vnd": 150000,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "REQUIRED",
+      "field": "destination_account_id"
+    }
+  },
+  {
+    "name": "missing amount_vnd",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "REQUIRED",
+      "field": "amount_vnd"
+    }
+  },
+  {
+    "name": "zero",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 0,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "AMOUNT_NOT_POSITIVE",
+      "field": "amount_vnd"
+    }
+  },
+  {
+    "name": "negative",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": -1,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "AMOUNT_NOT_POSITIVE",
+      "field": "amount_vnd"
+    }
+  },
+  {
+    "name": "fraction",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 1.5,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "INVALID_AMOUNT",
+      "field": "amount_vnd"
+    }
+  },
+  {
+    "name": "string amount",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": "150000",
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "INVALID_AMOUNT",
+      "field": "amount_vnd"
+    }
+  },
+  {
+    "name": "boolean amount",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": true,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "INVALID_AMOUNT",
+      "field": "amount_vnd"
+    }
+  },
+  {
+    "name": "null amount",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": null,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "INVALID_AMOUNT",
+      "field": "amount_vnd"
+    }
+  },
+  {
+    "name": "one dong",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 1,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": true,
+      "value": {
+        "source_account_id": "00000000-0000-4000-8000-000000000001",
+        "destination_account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_vnd": 1,
+        "memo": "Demo transfer"
+      }
+    }
+  },
+  {
+    "name": "safe upper bound",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 9007199254740991,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": true,
+      "value": {
+        "source_account_id": "00000000-0000-4000-8000-000000000001",
+        "destination_account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_vnd": 9007199254740991,
+        "memo": "Demo transfer"
+      }
+    }
+  },
+  {
+    "name": "unsafe integer",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 9007199254740992,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "AMOUNT_TOO_LARGE",
+      "field": "amount_vnd"
+    }
+  },
+  {
+    "name": "scientific integral",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 1000000.0,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": true,
+      "value": {
+        "source_account_id": "00000000-0000-4000-8000-000000000001",
+        "destination_account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_vnd": 1000000,
+        "memo": "Demo transfer"
+      }
+    }
+  },
+  {
+    "name": "self transfer",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000001",
+      "amount_vnd": 150000,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "SELF_TRANSFER",
+      "field": "destination_account_id"
+    }
+  },
+  {
+    "name": "invalid uuid",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "not-a-uuid",
+      "amount_vnd": 150000,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "INVALID_ACCOUNT_ID",
+      "field": "destination_account_id"
+    }
+  },
+  {
+    "name": "uuid whitespace",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": " 00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "INVALID_ACCOUNT_ID",
+      "field": "destination_account_id"
+    }
+  },
+  {
+    "name": "numeric account",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": 12,
+      "amount_vnd": 150000,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "INVALID_ACCOUNT_ID",
+      "field": "destination_account_id"
+    }
+  },
+  {
+    "name": "null account",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": null,
+      "amount_vnd": 150000,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "INVALID_ACCOUNT_ID",
+      "field": "destination_account_id"
+    }
+  },
+  {
+    "name": "short uuid",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000",
+      "amount_vnd": 150000,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": false,
+      "code": "INVALID_ACCOUNT_ID",
+      "field": "destination_account_id"
+    }
+  },
+  {
+    "name": "empty memo",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": ""
+    },
+    "expected": {
+      "ok": true,
+      "value": {
+        "source_account_id": "00000000-0000-4000-8000-000000000001",
+        "destination_account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_vnd": 150000,
+        "memo": null
+      }
+    }
+  },
+  {
+    "name": "null memo",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": null
+    },
+    "expected": {
+      "ok": true,
+      "value": {
+        "source_account_id": "00000000-0000-4000-8000-000000000001",
+        "destination_account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_vnd": 150000,
+        "memo": null
+      }
+    }
+  },
+  {
+    "name": "trim memo",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": " \t rent \n"
+    },
+    "expected": {
+      "ok": true,
+      "value": {
+        "source_account_id": "00000000-0000-4000-8000-000000000001",
+        "destination_account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_vnd": 150000,
+        "memo": "rent"
+      }
+    }
+  },
+  {
+    "name": "blank memo",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": " \t\r\n"
+    },
+    "expected": {
+      "ok": true,
+      "value": {
+        "source_account_id": "00000000-0000-4000-8000-000000000001",
+        "destination_account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_vnd": 150000,
+        "memo": null
+      }
+    }
+  },
+  {
+    "name": "max memo",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    "expected": {
+      "ok": true,
+      "value": {
+        "source_account_id": "00000000-0000-4000-8000-000000000001",
+        "destination_account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_vnd": 150000,
+        "memo": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    }
+  },
+  {
+    "name": "long memo",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    "expected": {
+      "ok": false,
+      "code": "MEMO_TOO_LONG",
+      "field": "memo"
+    }
+  },
+  {
+    "name": "emoji boundary",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": "🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉"
+    },
+    "expected": {
+      "ok": true,
+      "value": {
+        "source_account_id": "00000000-0000-4000-8000-000000000001",
+        "destination_account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_vnd": 150000,
+        "memo": "🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉"
+      }
+    }
+  },
+  {
+    "name": "emoji overflow",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": "🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉"
+    },
+    "expected": {
+      "ok": false,
+      "code": "MEMO_TOO_LONG",
+      "field": "memo"
+    }
+  },
+  {
+    "name": "numeric memo",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": 42
+    },
+    "expected": {
+      "ok": false,
+      "code": "INVALID_MEMO",
+      "field": "memo"
+    }
+  },
+  {
+    "name": "preserve unicode space",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": " rent "
+    },
+    "expected": {
+      "ok": true,
+      "value": {
+        "source_account_id": "00000000-0000-4000-8000-000000000001",
+        "destination_account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_vnd": 150000,
+        "memo": " rent "
+      }
+    }
+  },
+  {
+    "name": "optional memo",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000
+    },
+    "expected": {
+      "ok": true,
+      "value": {
+        "source_account_id": "00000000-0000-4000-8000-000000000001",
+        "destination_account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_vnd": 150000,
+        "memo": null
+      }
+    }
+  },
+  {
+    "name": "unknown field",
+    "input": {
+      "source_account_id": "00000000-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": "Demo transfer",
+      "balance_vnd": 0
+    },
+    "expected": {
+      "ok": false,
+      "code": "UNKNOWN_FIELD",
+      "field": "payload"
+    }
+  },
+  {
+    "name": "array payload",
+    "input": [],
+    "expected": {
+      "ok": false,
+      "code": "INVALID_PAYLOAD",
+      "field": "payload"
+    }
+  },
+  {
+    "name": "null payload",
+    "input": null,
+    "expected": {
+      "ok": false,
+      "code": "INVALID_PAYLOAD",
+      "field": "payload"
+    }
+  },
+  {
+    "name": "string payload",
+    "input": "bad",
+    "expected": {
+      "ok": false,
+      "code": "INVALID_PAYLOAD",
+      "field": "payload"
+    }
+  },
+  {
+    "name": "uppercase UUID",
+    "input": {
+      "source_account_id": "ABCDEF00-0000-4000-8000-000000000001",
+      "destination_account_id": "00000000-0000-4000-8000-000000000002",
+      "amount_vnd": 150000,
+      "memo": "Demo transfer"
+    },
+    "expected": {
+      "ok": true,
+      "value": {
+        "source_account_id": "abcdef00-0000-4000-8000-000000000001",
+        "destination_account_id": "00000000-0000-4000-8000-000000000002",
+        "amount_vnd": 150000,
+        "memo": "Demo transfer"
+      }
+    }
+  }
+]

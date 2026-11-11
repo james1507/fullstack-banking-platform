@@ -1,0 +1,16 @@
+# Disposable test stack. Kept separate from the interactive demo project and its volume.
+services:
+  db:
+    environment:
+      POSTGRES_DB: banking_e2e_test
+    ports: !override
+      - "127.0.0.1:5434:5432"
+  backend:
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-banking}:${POSTGRES_PASSWORD:-local-demo-database-only}@db:5432/banking_e2e_test
+      ALLOWED_ORIGINS: http://localhost:5174
+    ports: !override
+      - "127.0.0.1:8001:8000"
+  frontend:
+    ports: !override
+      - "127.0.0.1:5174:80"
