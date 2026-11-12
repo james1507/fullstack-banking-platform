@@ -1,5 +1,7 @@
 # Testing and CI
 
+> **V1 baseline document.** Preserved for historical context. The [V2 addendum](v2/TEST_REPORT.md) and [current feature matrix](v2/FEATURE_MATRIX.md) describe this branch’s implemented behavior and verification.
+
 ## Prerequisites and lifecycle
 
 Docker Compose 2.24.4+ is required for the E2E port overrides. Host Node 22.18+ supports the TypeScript parity runner without adding a transpiler dependency. No host Python is required for Make targets.

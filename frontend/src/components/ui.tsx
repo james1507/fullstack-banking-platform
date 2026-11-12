@@ -125,7 +125,9 @@ export function AccountCard({ account, dark = false }: { account: Account; dark?
         <span className="card-icon">
           <Landmark size={19} />
         </span>
-        <span className="account-currency">VND ACCOUNT</span>
+        <span className="account-currency">
+          {account.account_type} · {account.status}
+        </span>
       </div>
       <div>
         <p>{account.name}</p>
@@ -142,6 +144,13 @@ export function AccountCard({ account, dark = false }: { account: Account; dark?
         </button>
       </div>
       {copyError && <small role="alert">Copy manually: {account.id}</small>}
+      <Link
+        className="text-link"
+        to={`/accounts/${account.id}`}
+        aria-label={`Manage ${account.name}`}
+      >
+        Account details <ArrowUpRight size={14} />
+      </Link>
     </article>
   );
 }

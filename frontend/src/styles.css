@@ -1,4 +1,134 @@
 @import 'tailwindcss';
+.recipient-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: 20px;
+}
+.recipient-grid > .settings-panel {
+  max-width: none;
+}
+.main-content > .settings-panel {
+  margin-bottom: 24px;
+}
+.recipient-search {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+.recipient-search .field {
+  margin: 0;
+}
+.search-panel {
+  max-width: none;
+  margin-bottom: 24px;
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 18px;
+}
+.statement-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 20px;
+}
+.statement-totals dt {
+  color: #687961;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.statement-totals dd {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+@media print {
+  .sidebar,
+  .topbar,
+  .app-footer,
+  .receipt-wrap > a,
+  .receipt .button,
+  .receipt-home {
+    display: none !important;
+  }
+  .app-shell,
+  .workspace {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+  .main-content {
+    padding: 0 !important;
+  }
+  .receipt {
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+}
+.settings-panel {
+  padding: 28px;
+  max-width: 760px;
+  display: grid;
+  gap: 20px;
+}
+.settings-panel form,
+.settings-panel fieldset {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+}
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+  align-items: center;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.detail-balance {
+  font-size: 32px;
+}
+.break-id {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.close-account {
+  border-top: 1px solid #dce4df;
+  padding-top: 24px;
+  display: grid;
+  gap: 16px;
+}
+.check-label {
+  display: flex;
+  gap: 10px;
+  align-items: start;
+}
+.check-label input {
+  width: auto;
+  margin-top: 3px;
+}
+.success-notice {
+  color: #173f38;
+  background: #edf3e8;
+  padding: 14px;
+  border-radius: 10px;
+}
+@media (max-width: 800px) {
+  .detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-panel {
+    padding: 20px;
+  }
+}
 @theme {
   --color-moneta: #173f38;
 }
@@ -160,6 +290,7 @@ h3 {
   display: flex;
 }
 .sidebar {
+  overflow-y: auto;
   width: 232px;
   flex-shrink: 0;
   background: #fff;
@@ -1738,9 +1869,12 @@ tr:last-child td {
     flex-direction: row;
     gap: 3px;
     margin-top: 15px;
-    justify-content: space-between;
+    justify-content: flex-start;
+    max-width: 100%;
+    overflow-x: auto;
   }
   .main-nav a {
+    flex-shrink: 0;
     border-radius: 0;
     padding: 13px 7px;
     font-size: 9px;

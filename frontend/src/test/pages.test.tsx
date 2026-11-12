@@ -10,7 +10,16 @@ const mocks = vi.hoisted(() => ({ login: vi.fn() }));
 vi.mock('../auth', () => ({ useAuth: () => ({ user: null, loading: false, login: mocks.login }) }));
 vi.mock('../lib/api', async (importOriginal) => {
   const original = await importOriginal<typeof import('../lib/api')>();
-  return { ...original, api: { accounts: vi.fn(), history: vi.fn(), transfer: vi.fn() } };
+  return {
+    ...original,
+    api: {
+      accounts: vi.fn(),
+      history: vi.fn(),
+      transfer: vi.fn(),
+      beneficiaries: vi.fn(),
+      previewTransfer: vi.fn(),
+    },
+  };
 });
 const account: Account = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -18,6 +27,10 @@ const account: Account = {
   name: 'Everyday account',
   currency: 'VND',
   balance_vnd: 5000000,
+  account_type: 'CHECKING',
+  status: 'ACTIVE',
+  daily_outgoing_limit_vnd: null,
+  closed_at: null,
 };
 function wrap(element: React.ReactNode) {
   return render(
@@ -39,6 +52,17 @@ function wrap(element: React.ReactNode) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.accounts).mockResolvedValue([account]);
+  vi.mocked(api.beneficiaries).mockResolvedValue([]);
+  vi.mocked(api.previewTransfer).mockImplementation(async (payload) => ({
+    ...payload,
+    source_name: account.name,
+    source_number: account.account_number,
+    destination_masked_number: '••••0001',
+    estimated_balance_vnd: account.balance_vnd - payload.amount_vnd,
+    fee_vnd: 0,
+    currency: 'VND',
+    checked_at: '2026-11-12T00:00:00Z',
+  }));
   vi.mocked(api.history).mockResolvedValue({
     items: [],
     page: 1,
@@ -131,6 +155,26 @@ describe('Transfer', () => {
     await user.click(screen.getByRole('button', { name: /Review transfer/ }));
     expect(await screen.findByText('Enter a whole VND amount.')).toBeVisible();
     expect(api.transfer).not.toHaveBeenCalled();
+  });
+  it('does not allow confirmation when the server preview rejects a stale account', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.previewTransfer).mockRejectedValueOnce(
+      new APIError('ACCOUNT_NOT_ACTIVE', 'Source account is frozen.', 409),
+    );
+    wrap(<TransferForm accounts={[account]} />);
+    await user.click(screen.getByRole('button', { name: /Use Bob/ }));
+    await user.type(screen.getByLabelText('Amount'), '100');
+    await user.click(screen.getByRole('button', { name: 'Review transfer' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Source account is frozen.');
+    expect(screen.queryByRole('button', { name: 'Confirm & send' })).not.toBeInTheDocument();
+    expect(api.transfer).not.toHaveBeenCalled();
+  });
+  it('excludes frozen and closed accounts from the source picker', async () => {
+    const user = userEvent.setup();
+    wrap(<TransferForm accounts={[{ ...account, status: 'FROZEN' }]} />);
+    expect(screen.getByRole('button', { name: 'Review transfer' })).toBeDisabled();
+    await user.click(screen.getByRole('combobox', { name: 'From account' }));
+    expect(screen.queryByRole('option', { name: /Everyday account/ })).not.toBeInTheDocument();
   });
 });
 describe('History', () => {

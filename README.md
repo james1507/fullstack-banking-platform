@@ -4,7 +4,9 @@ A full-stack banking simulation with React, FastAPI and PostgreSQL, built to dem
 
 **Simulation only.** Users, account numbers and VND balances are fictional. Moneta does not connect to banks, move real money or collect real customer information.
 
-**Local verification · 11 November 2026:** 70 backend tests, 59 frontend tests and 5 Chromium E2E journeys passed. Python and TypeScript validation matched across 36 shared cases. Backend application line coverage measured 96%. [Read the verification report](docs/implementation-report.md).
+**V2 increment · M0–M5:** account lifecycle and roles, saved recipients, server-verified transfer review, advanced history, reconciled CSV statements, scheduled transfers, a leased PostgreSQL worker and a deduplicated in-app inbox. **Overall V2 remains in progress:** analytics/budgets, security settings and the full operations center are pending. [Current feature matrix](docs/v2/FEATURE_MATRIX.md) · [Implementation status](docs/v2/IMPLEMENTATION_STATUS.md) · [Actual verification](docs/v2/TEST_REPORT.md).
+
+V1 baseline (11 November 2026): 70 backend / 59 frontend / five E2E, 96% application line coverage. **Latest local V2 checks (12 November 2026): 134 backend, 70 frontend, ten Chromium E2E and 36 parity cases passed; backend application line coverage 95%.** Integrated CI and final follow-up executions are distinguished in the verification report. Remote GitHub Actions has not been run during this upgrade.
 
 ## Product preview
 
@@ -38,6 +40,20 @@ The shared dropdown supports arrow keys, Home/End, Enter/Space, Escape, Tab and 
 
 </details>
 
+## V2 preview and review path
+
+| Reconciled statements | Durable schedule execution |
+|---|---|
+| [![Real account statement with opening, debit, credit and closing totals](docs/screenshots/v2-statements.png)](docs/screenshots/v2-statements.png) | [![Scheduled transfer completed by the real worker with a receipt link](docs/screenshots/v2-schedule.png)](docs/screenshots/v2-schedule.png) |
+
+| Saved recipients | In-app notifications |
+|---|---|
+| [![Owner-scoped saved recipient with archive and transfer controls](docs/screenshots/v2-beneficiaries.png)](docs/screenshots/v2-beneficiaries.png) | [![Notifications delivered from committed outbox events](docs/screenshots/v2-inbox.png)](docs/screenshots/v2-inbox.png) |
+
+V2 captures come from the isolated running API, worker and PostgreSQL E2E stack. Earlier dashboard/mobile images above document the V1 baseline. [Printable V2 receipt](docs/screenshots/v2-receipt.png).
+
+Review [architecture](docs/v2/ARCHITECTURE.md), [API contracts](docs/v2/API_CONTRACTS.md), [threat model](docs/v2/SECURITY_THREAT_MODEL.md), [incident reproductions](docs/v2/INCIDENT_RUNBOOKS.md), [metrics and unmeasured targets](docs/v2/SLO_AND_METRICS.md), and [upgrade/backup rehearsal](docs/v2/DEPLOYMENT_CHECKLIST.md). Decisions explain [snapshot arithmetic](docs/v2/ADR/002-statement-snapshots.md) and [fenced worker claims](docs/v2/ADR/003-scheduled-posting-and-delivery.md).
+
 ## What to review first
 
 The project concentrates on the boundaries where a financial-style application can fail: a retry becomes a second debit, two requests spend the same balance, a rotated credential remains usable, or a valid user accesses someone else's resource.
@@ -50,6 +66,8 @@ The project concentrates on the boundaries where a financial-style application c
 | Does authentication include object authorization? | [Ownership-scoped queries](backend/app/repositories.py), source-owner checks and Alice/Bob/Carol isolation tests. |
 | Does the browser handle failures safely? | [Typed HTTP boundary](frontend/src/lib/api.ts), [transfer form](frontend/src/TransferForm.tsx), coordinated refresh and same-key timeout retry tests. |
 | Can translated business logic preserve behavior? | [Python/TypeScript migration](docs/migration-parity.md): 36 shared expected results and byte-for-byte canonical JSON comparison. |
+| Can worker restarts repeat a payment? | [Worker](backend/app/worker.py): stable occurrence identity, lease-token fencing and atomic posting/outcome; [process death and redelivery tests](backend/tests/test_scheduling.py). |
+| Can a statement mix balances from different commits? | [Reporting](backend/app/reporting.py): REPEATABLE READ, immutable funding baseline and exact aggregate strings; [coordinated concurrent-commit test](backend/tests/test_reporting.py). |
 | Can another developer reproduce the result? | Compose, Alembic, repeatable seeds, isolated test databases, Make targets and [CI workflow](.github/workflows/ci.yml). |
 
 For a short review, run the demo below, read the transfer service, then inspect the concurrency and rollback tests. A [seven-minute walkthrough](docs/demo-script.md) connects the UI behavior to the implementation.
@@ -96,7 +114,7 @@ cp .env.example .env
 docker compose up --build -d --wait
 ```
 
-The first build downloads container images and dependencies. Startup waits for PostgreSQL, applies Alembic migrations, seeds demo users without duplicates, starts the API and brings up the frontend.
+The first build downloads container images and dependencies. Startup waits for PostgreSQL, applies Alembic migrations, seeds demo users without duplicates, starts the API, then starts the worker and frontend after readiness.
 
 | Service | Address |
 |---|---|
@@ -114,7 +132,7 @@ docker compose ps
 curl --fail http://localhost:8000/health/ready
 ```
 
-A ready API returns `{"status":"ready","migration":"001"}`. `make up` performs the same build/start operation once `.env` exists.
+A ready API returns `{"status":"ready","migration":"005"}`. `make up` performs the same build/start operation once `.env` exists.
 
 ### Stop and resume
 
@@ -133,6 +151,8 @@ These credentials are public, development-only examples.
 |---|---|---|---|---|
 | Alice | `alice@example.test` | `DemoPass123!` | `DEMO-100001` | 5,000,000 VND |
 | Bob | `bob@example.test` | `DemoPass123!` | `DEMO-200001` | 3,000,000 VND |
+| Operations | `operator@example.test` | `DemoPass123!` | No funded account | OPERATIONS role |
+| Auditor | `auditor@example.test` | `DemoPass123!` | No funded account | AUDITOR role |
 
 | Owner | Public fictional account ID |
 |---|---|
@@ -161,17 +181,32 @@ On a fresh database, the result is:
 
 Exact balances assume no earlier transfers. `make seed` is idempotent and preserves existing balances; it does not reset the demonstration.
 
+### V2 demo extension
+
+1. Open **My accounts → Open demo account**. Create zero-balance savings, rename it and configure a daily outgoing limit. No money is created by account opening. Close only after zeroing balance and cancelling your linked active/paused schedules.
+2. Open **Recipients → Add recipient**. Save Bob's fictional UUID, review and confirm; use the saved recipient for a transfer. Preview checks current server policy and displays masked destination, zero fee and an estimated remaining balance.
+3. Open **Transactions → Advanced search**. Filter account, dates, direction, reference and amount; navigate server cursors. Open **Statements**, choose account/date range and download reconciled CSV.
+4. Open **Schedules → Create schedule**. Choose a one-time future clock (or weekly/monthly cadence), IANA timezone and amount. Review/confirm. Creating a schedule does not debit or reserve funds. Worker performs the same validated posting when due; open execution history and its receipt.
+5. Open **Inbox** after worker delivery. Transfer and schedule events are persisted only after their transaction commits; read states survive reload. No SMS/email is sent.
+6. Sign in as Operations to freeze/unfreeze a fictional account with a reason. Customer outgoing transfers reject while frozen; incoming transfers remain allowed. Auditor can inspect append-only audit events and cannot perform money or account-control writes.
+
+Schedules use 60-second fenced leases and at most five transient attempts. Business rejections are final for that run. Monthly dates clamp to month end; DST gaps/overlaps and downtime have explicit policies in [ADR 003](docs/v2/ADR/003-scheduled-posting-and-delivery.md). No fake funds, external payment rails or worker-specific balance mutation path.
+
 ## Features and application routes
 
 | Area | Behavior |
 |---|---|
 | Sign-in and session | Validated credentials, readable errors, loading state, protected routes, refresh restoration and logout |
 | Dashboard | Authoritative total balance, owned-account count, completed-transfer count and recent activity |
-| Accounts | Owned accounts only, fictional account numbers, integer VND balances and copyable IDs |
+| Accounts | Open at zero, rename, set daily limit, close eligible accounts; type/status; operator freeze and immutable audit |
 | Transfer form | Source account, recipient UUID, formatted whole VND input, optional memo and explicit review |
 | Safe submission | Duplicate-click guard, server idempotency and preserved request/payload after an uncertain outcome |
 | History | Server pagination, direction/account filters, reference search, stable ordering and retry/empty/loading states |
-| Receipt | Reference, timestamp, source/destination IDs, amount, memo and committed status |
+| Receipt | Reference, timestamp, source/destination IDs, amount, memo, committed status and print layout |
+| Saved recipients | Private search, add, rename, archive and restore; duplicate active destination protection |
+| Statements | Inclusive timezone dates, repeatable snapshot, opening/closing reconciliation and formula-safe CSV |
+| Schedules | One-time/weekly/monthly, reviewed creation, versioned edits, pause/resume/cancel and execution history |
+| Worker/inbox | PostgreSQL queue claims, lease recovery, shared posting policy, transactional outbox and deduplicated notifications |
 | Responsive UI | Desktop sidebar, mobile navigation, scrollable tables and persistent simulation indicator |
 | Dropdowns | Shared visual states, keyboard/typeahead behavior, descriptions, viewport-aware menus and form integration |
 | Diagnostics | Liveness/readiness endpoints, generated request IDs, structured request logs and deterministic errors |
@@ -184,6 +219,14 @@ Exact balances assume no earlier transfers. `make seed` is idempotent and preser
 | `/transfers/new` | Transfer entry and review |
 | `/transfers` | Searchable/filterable history |
 | `/transfers/:id` | Authorized transfer receipt |
+| `/accounts/new`, `/accounts/:id` | Open account, settings, history and closure |
+| `/beneficiaries`, `/beneficiaries/new` | Saved recipients and reviewed creation |
+| `/transfers/search` | Bounded advanced search with signed cursors |
+| `/statements` | Statement summary and CSV download |
+| `/scheduled-transfers`, `/scheduled-transfers/new`, `/scheduled-transfers/:id` | Plans, reviewed creation, versioned edits and occurrence history |
+| `/notifications` | Owner-scoped durable inbox and read states |
+| `/ops` | OPERATIONS account freeze controls |
+| `/audit` | OPERATIONS/AUDITOR read-only audit explorer |
 | `/about` | Simulation and implementation explanation |
 | Other paths | Not-found page with workspace navigation |
 
@@ -218,6 +261,9 @@ flowchart LR
     Auth --> DB[(PostgreSQL 16)]
     Service -->|one atomic transaction| DB
     Queries --> DB
+    Worker[Same-codebase Python worker] --> Service
+    Worker -->|lease / outcome / inbox| DB
+    Service -->|transactional outbox| DB
 ```
 
 Nginx serves the production web build and proxies `/api`. In frontend development, Vite proxies API calls to port 8000. API documentation and health endpoints are available directly on port 8000.
@@ -231,7 +277,10 @@ Nginx serves the production web build and proxies `/api`. In frontend developmen
 | [Request/response schemas](backend/app/schemas.py) | Input boundaries and output contracts |
 | [Repositories](backend/app/repositories.py) | Owned-account queries, visible transfers and database pagination |
 | [Transfer service](backend/app/transfers.py) | Key claim, ownership/business checks, locks, movement, ledger and saved result |
-| [Migration](backend/migrations/versions/001_initial.py) | Tables, indexes, database constraints and ledger invariants |
+| [Initial migration](backend/migrations/versions/001_initial.py) | Original tables and paired-ledger constraints |
+| [Incremental migrations](backend/migrations/versions) | 002 lifecycle/audit, 003 beneficiaries, 004 funding baseline, 005 schedules/outbox/inbox |
+| [Scheduling](backend/app/scheduling.py) / [worker](backend/app/worker.py) | Local-clock policy, versioned plans, fenced claims, shared posting and inbox delivery |
+| [Reporting](backend/app/reporting.py) | Consistent snapshot, exact totals, signed search cursors and CSV |
 
 The service is deliberately synchronous and monolithic. Transaction boundaries remain visible in one place, and PostgreSQL coordinates concurrent requests across processes.
 
@@ -261,7 +310,7 @@ sequenceDiagram
 
 The unique constraint covers `(user_id, operation, key)`. `INSERT ... ON CONFLICT DO NOTHING` waits for a conflicting transaction; a subsequent statement at PostgreSQL READ COMMITTED isolation reads its committed result. Account locks follow one global UUID order for both transfer directions.
 
-For a new valid transfer, the service checks source ownership and available funds before modifying balances. Debit, credit, transfer, ledger and saved response commit together. A worker crash or unexpected write failure rolls back the entire transaction, including the uncommitted key claim.
+For a new valid transfer, the service checks source ownership and available funds before modifying balances. Debit, credit, transfer, ledger, audit, outbox events and saved response commit together. Scheduled execution also commits its occurrence outcome and next slot in that same transaction. A worker crash or unexpected write failure rolls back the entire transaction, including the uncommitted key claim.
 
 | Request condition | Outcome |
 |---|---|
@@ -285,14 +334,18 @@ Idempotency applies to the scoped operation/key, not to two deliberate transfers
 | `ledger_entries` | Movement audit trail | One debit and one credit; matching account/amount; immutable rows |
 | `idempotency_records` | Request fingerprint and result | Scoped unique key; canonical hash; JSONB response; completion state |
 | `refresh_sessions` | Rotating credential family | Unique token hash; user/family indexes; expiry, rotation and revocation timestamps |
+| `audit_events` | Append-only action trail | Actor, target, action, safe metadata, request ID; immutable trigger |
+| `beneficiaries` | Owner address book | One active destination per owner; archive preserves history |
+| `transfer_schedules` / `schedule_occurrences` | Plans and execution facts | Version, due time, stable occurrence ID, lease token, capped attempts, linked committed transfer |
+| `outbox_events` / `notifications` | Durable in-app delivery | Event written with posting; unique event ID deduplicates inbox; read timestamps |
 
-All identifiers are server-generated UUIDs; timestamps use timezone-aware UTC. Histories sort by `created_at DESC, id DESC` and use account/date indexes. The seed uses deterministic fictional account IDs for an easy walkthrough.
+All identifiers are server-generated UUIDs. Persisted event timestamps use UTC; schedule `starts_local` deliberately stores naive wall time alongside an IANA timezone. Histories sort by `created_at DESC, id DESC` and use account/date indexes. The seed uses deterministic fictional account IDs for an easy walkthrough.
 
-Monetary values use integer VND throughout. Transfer amounts are limited to `1..9,007,199,254,740,991`, the common JSON-safe integer range. Booleans, fractional amounts, amount strings, zero and negative values are rejected at the HTTP boundary. The browser formats numbers for display and sends validated integer JSON.
+Monetary values use integer VND throughout. Transfer amounts are limited to `1..9,007,199,254,740,991`, the common JSON-safe integer range. Booleans, fractional amounts, amount strings, zero and negative values are rejected at the HTTP boundary. The browser formats numbers for display and sends validated integer JSON. New statement aggregate amounts use canonical decimal strings and BigInt on the browser because turnover may exceed safe Number precision. V1 summary explicitly rejects an unsafe aggregate instead of rounding it.
 
 A deferred PostgreSQL trigger requires every new transfer to have exactly two matching ledger entries at commit. Additional triggers validate ledger inserts and reject UPDATE/DELETE of committed transfer and ledger rows. Database owners remain privileged; the local demo does not claim protection against an administrator bypassing database controls.
 
-Opening balances are established by seed rather than opening-balance ledger entries. See [database design](docs/database-schema.md) for constraints, indexes, archival considerations and seed behavior.
+Synthetic initial funding is established by seed rather than fictitious transfer entries. Migration 004 backfills an immutable opening baseline, allowing exact reconciliation against subsequent ledger entries. See [database design](docs/database-schema.md) for constraints, indexes, archival considerations and seed behavior.
 
 ## Authentication and security
 
@@ -305,7 +358,9 @@ Opening balances are established by seed rather than opening-balance ledger entr
 | Rotation/reuse | Every refresh rotates the token; reuse revokes the family; PostgreSQL advisory/row locks serialize family operations |
 | Logout | Revoke refresh family and clear cookie; issued bearer tokens expire naturally |
 | Cookie request protection | Exact Origin allowlist on login, refresh and logout, plus explicit credentialed CORS configuration |
-| Object access | Accounts scoped to owner; source ownership required for movement; receipt visible to either involved account owner |
+| Object access | Accounts, recipients, plans, statements and inbox scoped to owner; receipt visible to involved owner |
+| Roles | CUSTOMER posts money; OPERATIONS freezes with reason; AUDITOR/OPERATIONS read immutable audit; worker revalidates active customer |
+| Recipient throttling | 30 authenticated recipient lookups per user/minute per API process |
 | Error/log hygiene | Sanitized error envelope and generated request ID; no submitted passwords, bearer headers or refresh cookies in request logs |
 | Sign-in throttling | Ten attempts per source IP per 60 seconds within one API process |
 | Local exposure | Loopback-only published ports; development HTTP cookie settings |
@@ -319,7 +374,7 @@ Public credentials and `.env.example` values are local demonstration settings. P
 
 ## API reference and replay exercise
 
-The API uses the `/api/v1` prefix. [Swagger UI](http://localhost:8000/docs) and [OpenAPI JSON](http://localhost:8000/openapi.json) describe request/response schemas when the local stack is running.
+The API uses the `/api/v1` prefix. The table below preserves V1; [V2 API contracts](docs/v2/API_CONTRACTS.md) list all additive endpoints and state/version rules. [Swagger UI](http://localhost:8000/docs) and [OpenAPI JSON](http://localhost:8000/openapi.json) describe request/response schemas when the local stack is running.
 
 | Method | Path | Success | Access |
 |---|---|---|---|
@@ -372,9 +427,9 @@ Keys contain 8–100 ASCII letters, digits, underscores or hyphens. Successful r
 | HTTP status | Typical meaning |
 |---|---|
 | `401` | Missing/invalid/expired access, bad credentials or rejected refresh |
-| `403` | Disallowed Origin |
+| `403` | Disallowed Origin or role |
 | `404` | Missing or unauthorized account/transfer |
-| `409` | Insufficient funds, changed input for a reused key or balance limit |
+| `409` | Funds/status/limit conflict, changed idempotent input, stale schedule version or invalid lifecycle action |
 | `422` | Malformed request, invalid amount, missing key or self-transfer |
 | `429` | Sign-in attempt limit |
 | `500` / `503` | Sanitized unexpected failure / service readiness failure |
@@ -458,20 +513,19 @@ On a Linux host that needs browser system packages, use `npx playwright install 
 
 `make ci` builds/starts the app, runs frontend tests, lint/type checking, backend tests with coverage, language parity and the isolated Compose/E2E stack. Local Python installation is optional because Make uses the backend image.
 
-### Last observed results
+### Latest V2 verification
 
 | Check | Observed result | Scope |
 |---|---|---|
-| Backend | **70 passed** | API, authentication, ownership, rollback, concurrency, constraints and Python shared fixtures |
-| Backend line coverage | **96%** | Application code measured by pytest-cov; scenario assertions remain the main correctness evidence |
-| Frontend | **59 passed** | Five Vitest files covering auth, HTTP contracts, forms, history, dropdowns and TypeScript shared fixtures |
-| Browser | **5 passed** | Chromium journeys against real FastAPI/PostgreSQL services, including responsive dropdown bounds |
-| Migration parity | **36 matched** | Both runners check expected values and produce identical canonical JSONL |
-| Build/quality | **Passed locally** | Production build, Ruff, ESLint, Prettier and strict TypeScript |
-| GitHub Actions | **Defined; remote run pending** | No successful remote workflow run is claimed |
-| Native Linux amd64 | **Not executed locally** | Configured for the GitHub-hosted runner |
+| Backend | **134 passed**, 95% application line coverage | PostgreSQL/API, migrations, process recovery, worker, statements and security |
+| Frontend | **70 passed** in eight files | Vitest component/client/contract and parity checks |
+| Browser | **10 passed** | Real API, PostgreSQL and worker journeys, CSV download and responsive bounds |
+| Migration parity | **36 matched** in baseline and incremental runs | Exact Python/TypeScript canonical fixture comparison |
+| Build/quality | Local commands recorded with results | Production build, Ruff, ESLint, Prettier, strict TypeScript |
+| GitHub Actions | **Defined; remote run pending** | No successful remote workflow run claimed |
+| Native Linux amd64 | **Not executed locally** | Configured for GitHub-hosted runner |
 
-Results were observed on 11 November 2026. The initial full `make ci` passed; the subsequent dropdown change passed its frontend lint/build/unit and five E2E checks. Backend tests were not repeated for that frontend-only change. This README update changes documentation only; it does not represent a new application test run.
+Baseline and each verified V2 slice are recorded in [TEST_REPORT.md](docs/v2/TEST_REPORT.md), including failures found and fixed. Local suite results do not establish production availability or throughput.
 
 Both language-specific test counts include the same 36 fixture cases. The standalone comparison is a separate parity check, not 36 extra UI journeys.
 
@@ -488,8 +542,13 @@ Both language-specific test counts include the same 36 fixture cases. The standa
 | Two concurrent refreshes using one old token | One success, one reuse rejection, family revocation |
 | Bob requests an existing Alice/Carol transfer | `404`; unrelated history stays empty |
 | Ledger UPDATE/DELETE or incomplete transfer | Database rejects mutation or unbalanced commit |
+| Forced process exit before/after posting commit | Precommit writes roll back; committed exact result replays |
+| Multiple worker processes / expired lease | One money effect; stale lease token cannot post |
+| Worker death during posting / inbox acknowledgment | Atomic rollback or committed outcome; lease recovery and event dedupe |
+| Concurrent statement read and transfer commit | Snapshot remains internally reconciled |
+| Seeded V1 upgrade / disposable backup restore | Existing balances and posting counts preserved |
 
-Concurrency tests synchronize independent request threads with barriers and execute real PostgreSQL transactions. They do not replace row locks with mocks or use SQLite as a concurrency substitute. These are correctness tests, not throughput or production load benchmarks.
+Concurrency tests synchronize independent request threads and spawned processes with barriers and execute real PostgreSQL transactions. They do not replace row locks with mocks or use SQLite as a concurrency substitute. These are correctness tests, not throughput or production load benchmarks.
 
 ### Individual commands
 
@@ -504,6 +563,7 @@ Run from the repository root after `make up` and frontend dependency installatio
 | `make test-e2e` | Build/start a fresh disposable stack; run Playwright; clean up |
 | `npm --prefix frontend run build` | Type checking and production web build |
 | `npm --prefix frontend run format` | Apply frontend formatting |
+| `CAPTURE_V2=1 make test-e2e` | Regenerate actual V2 recipients, receipt, statement, schedule and inbox captures |
 | `CAPTURE_DEMO=1 make test-e2e` | Regenerate dashboard, login, review, receipt and mobile screenshots from a real run |
 
 ### Test isolation and reports
@@ -526,7 +586,7 @@ The [CI workflow](.github/workflows/ci.yml) runs on pushes to `main`, pull reque
 | Job | Checks |
 |---|---|
 | `quality` | PostgreSQL 16 service; Python 3.12; Node 22; Ruff; backend tests/coverage; frontend install/lint/build/tests; Python/TypeScript parity |
-| `compose-and-e2e` | Compose configuration; Chromium/system dependencies; container builds; readiness/startup and five browser journeys |
+| `compose-and-e2e` | Compose configuration; Chromium/system dependencies; container builds; readiness/startup and the current real-stack browser suite, including worker delivery |
 
 On failure, Actions uploads available backend reports or Playwright reports/traces and stack logs. There is no deployment job.
 
@@ -556,7 +616,7 @@ Run API/database in Docker and Vite on the host:
 ```bash
 # From the repository root, with .env already created.
 docker compose stop frontend
-docker compose up -d --build db backend
+docker compose up -d --build db backend worker
 cd frontend
 npm ci
 npm run dev
@@ -564,11 +624,20 @@ npm run dev
 
 Vite serves port 5173 and proxies `/api` to localhost:8000. Stop any other process using 5173 so Vite can use the configured origin. Frontend edits hot-reload; the containerized production frontend requires a rebuild.
 
+### Backup and upgrade rehearsal
+
+```bash
+./scripts/backup-demo.sh /absolute/private/path/moneta.dump
+./scripts/restore-demo-check.sh /absolute/private/path/moneta.dump
+```
+
+Backup refuses overwrite and uses private permissions. Restore check creates its own disposable `restore_*_test` database, migrates it and verifies unchanged balances/posting counts plus baseline reconciliation. It preserves the interactive database. An actual V1-to-current rehearsal was run; see [deployment checklist](docs/v2/DEPLOYMENT_CHECKLIST.md). This is local recovery evidence, not production disaster recovery.
+
 ### Operational commands
 
 ```bash
 docker compose ps
-docker compose logs --tail=100 backend
+docker compose logs --tail=100 backend worker
 docker compose logs --tail=100 frontend
 make migrate
 make seed
@@ -607,6 +676,7 @@ A fresh volume recreates Alice and Bob at their original balances. For repeatabl
 | Dropdowns still look like native OS menus | Rebuild the frontend with `docker compose up -d --build --no-deps frontend`, then reload the page. |
 | Browser test executable missing | Run `npx playwright install chromium` inside `frontend`; Linux may also need `--with-deps`. |
 | `DATABASE_URL must target a disposable database ending in _test` | Use `make test-backend`; do not point destructive test fixtures at the interactive database. |
+| Schedule remains pending | Confirm worker is running; inspect `docker compose logs --tail=100 worker`. Check due timezone, status, retry time and sanitized occurrence error. No funds are reserved. |
 | Different tabs unexpectedly require sign-in again | Per-tab refresh coordination cannot prevent simultaneous rotation in separate tabs; family reuse detection can require a fresh login. |
 | Transfer outcome is unknown after a network error | Use **Retry original transfer**. If the page was reloaded and the draft is lost, inspect history before creating a new attempt. |
 
@@ -645,7 +715,9 @@ fullstack-banking-platform/
 
 | Document | What it explains |
 |---|---|
-| [Architecture](docs/architecture.md) | Module boundaries, transaction flow and cache/session state |
+| [V2 delivery status](docs/v2/IMPLEMENTATION_STATUS.md) | Current increment, checks, explicit gaps and next executable step |
+| [V2 architecture and APIs](docs/v2/ARCHITECTURE.md) | Worker, domain boundaries, transaction sequence and links to current contracts |
+| [Architecture — V1 baseline](docs/architecture.md) | Module boundaries, transaction flow and cache/session state |
 | [Database design](docs/database-schema.md) | Schema, invariants, seed identities and retention decisions |
 | [Security model](docs/security.md) | Threats, implemented controls, evidence and assumptions |
 | [API contract](docs/api-contract.md) | Endpoints, payloads, pagination, exact error codes and replay semantics |
@@ -668,8 +740,8 @@ No intentionally broken code is imported into the running app. The pure migratio
 
 | Current boundary | Reason / next step |
 |---|---|
-| One synchronous API service | Keeps transaction ownership auditable. Revisit architecture when measured workload or ownership boundaries justify it. |
-| Materialized balances plus immutable movement ledger | Fast reads and transactional audit entries. Opening balances and reconciliation would need explicit ledger modeling. |
+| Synchronous modular API plus one same-codebase worker | PostgreSQL owns money and queue coordination; revisit topology only with measured need. |
+| Materialized balances plus immutable movement ledger | Fast reads and transactional audit entries. Immutable funding baseline supports exact statements; persisted operational reconciliation findings/UI remain pending. |
 | Indefinite idempotency retention | Avoids premature duplicate execution. A production archival policy must preserve retry guarantees. |
 | In-memory transfer recovery draft | Preserves safe retries within the current page. Cross-reload recovery needs a deliberate persistence/reconciliation design. |
 | Per-tab refresh coordination | Prevents refresh storms within a tab. Cross-tab coordination remains a future improvement. |
@@ -677,6 +749,8 @@ No intentionally broken code is imported into the running app. The pure migratio
 | Process-local sign-in limit and shared local DB role | Appropriate for a reproducible demo. Public deployment needs shared limits, trusted proxy configuration and least-privilege roles. |
 | Backend image includes test tooling | Reviewers can run checks without host Python. A deployment image should contain runtime dependencies only. |
 | Chromium automation and native ARM64 local execution | These environments were exercised. Other browsers, remote Linux CI and public hosting require their own validation. |
+
+**Pending V2:** dashboard trends/categories/budgets (M6), notification preferences and password/session settings (M7), operations jobs/incident UI/metrics (M8), optional P2 features and full release hardening. The working inbox and account-control screen do not imply those milestones are complete. See [feature matrix](docs/v2/FEATURE_MATRIX.md).
 
 No real payment rails, registration, KYC, MFA, password reset, SMS/email delivery, regulatory certification or production deployment are included. The simulation is intended to make application behavior and engineering decisions reviewable.
 
@@ -712,7 +786,7 @@ If `origin` already exists, inspect `git remote -v` and use your intended reposi
 
 Suggested GitHub description:
 
-> React + FastAPI + PostgreSQL banking simulation with atomic transfers, idempotent retries, rotating sessions, real database concurrency tests and Python/TypeScript validation parity.
+> React + FastAPI + PostgreSQL banking simulation with atomic transfers, scheduled payments, a durable worker, reconciled CSV statements and real-process recovery tests.
 
 Suggested topics: `fullstack`, `react`, `typescript`, `fastapi`, `postgresql`, `docker`, `github-actions`, `playwright`, `idempotency`.
 

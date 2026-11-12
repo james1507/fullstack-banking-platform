@@ -33,6 +33,16 @@ services:
       retries: 20
     volumes:
       - ./migration:/migration:ro
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-banking}:${POSTGRES_PASSWORD:-local-demo-database-only}@db:5432/${POSTGRES_DB:-banking}
+      JWT_SECRET: ${JWT_SECRET:?Copy .env.example to .env first}
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
   frontend:
     build:
       context: .

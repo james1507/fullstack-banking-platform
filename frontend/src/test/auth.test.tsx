@@ -47,6 +47,9 @@ it('restores session and clears view on logout', async () => {
     id: 'id',
     email: 'alice@example.test',
     display_name: 'Alice',
+    role: 'CUSTOMER',
+    timezone: 'Asia/Ho_Chi_Minh',
+    locale: 'en',
   });
   vi.mocked(api.logout).mockResolvedValue(undefined);
   renderApp();
@@ -60,6 +63,9 @@ it('responds to session expiry', async () => {
     id: 'id',
     email: 'alice@example.test',
     display_name: 'Alice',
+    role: 'CUSTOMER',
+    timezone: 'Asia/Ho_Chi_Minh',
+    locale: 'en',
   });
   renderApp();
   await screen.findByText('Alice');

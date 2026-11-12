@@ -34,8 +34,22 @@ def seed():
                     name="Everyday account",
                     currency="VND",
                     balance_vnd=balance,
+                    opening_balance_vnd=balance,
                 )
                 .on_conflict_do_nothing(index_elements=["account_number"])
+            )
+        for index, name, role in [(3, "Operator", "OPERATIONS"), (4, "Auditor", "AUDITOR")]:
+            db.execute(
+                insert(User)
+                .values(
+                    id=uuid.UUID(f"10000000-0000-4000-8000-{index:012d}"),
+                    email=f"{name.lower()}@example.test",
+                    display_name=name,
+                    role=role,
+                    password_hash=password_hasher.hash("DemoPass123!"),
+                    is_active=True,
+                )
+                .on_conflict_do_nothing(index_elements=["email"])
             )
 
 

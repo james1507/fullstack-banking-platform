@@ -1,4 +1,5 @@
-export const formatVND = (value: number) => `${new Intl.NumberFormat('en-US').format(value)} ₫`;
+export const formatVND = (value: number | bigint) =>
+  `${new Intl.NumberFormat('en-US').format(value)} ₫`;
 export const formatDate = (value: string) =>
   new Intl.DateTimeFormat('en-GB', {
     day: 'numeric',

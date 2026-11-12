@@ -6,6 +6,10 @@ const account = {
   name: 'Everyday account',
   currency: 'VND',
   balance_vnd: 5000000,
+  account_type: 'CHECKING',
+  status: 'ACTIVE',
+  daily_outgoing_limit_vnd: null,
+  closed_at: null,
 };
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
 const expired = () =>

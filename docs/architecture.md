@@ -1,5 +1,7 @@
 # Architecture
 
+> **V1 baseline document.** Preserved for historical context. The [V2 addendum](v2/ARCHITECTURE.md) and [current feature matrix](v2/FEATURE_MATRIX.md) describe this branch’s implemented behavior and verification.
+
 Moneta is one React web app, one synchronous FastAPI service and one PostgreSQL 16 database. No commercial APIs or banking connections.
 
 ```mermaid

@@ -1,5 +1,7 @@
 # Tradeoffs and next steps
 
+> **V1 baseline document.** Preserved for historical context. The [V2 addendum](v2/IMPLEMENTATION_STATUS.md) and [current feature matrix](v2/FEATURE_MATRIX.md) describe this branch’s implemented behavior and verification.
+
 - **One synchronous service:** clear transaction ownership and easy row-lock auditing. Async/microservices would add coordination without improving this demo.
 - **Materialized balances plus ledger:** fast reads, immutable audit entries, transactional updates. There are no opening-balance ledger entries; seed establishes balances directly. A production ledger would model opening balances and reconciliation explicitly.
 - **READ COMMITTED:** PostgreSQL's unique insert contention plus subsequent statement visibility is sufficient for the claim algorithm. This implementation must be reviewed before changing transaction isolation.

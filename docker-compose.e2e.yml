@@ -11,6 +11,9 @@ services:
       ALLOWED_ORIGINS: http://localhost:5174
     ports: !override
       - "127.0.0.1:8001:8000"
+  worker:
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-banking}:${POSTGRES_PASSWORD:-local-demo-database-only}@db:5432/banking_e2e_test
   frontend:
     ports: !override
       - "127.0.0.1:5174:80"

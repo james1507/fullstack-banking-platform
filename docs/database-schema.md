@@ -1,5 +1,7 @@
 # Database and invariants
 
+> **V1 baseline document.** Preserved for historical context. The [V2 addendum](v2/ARCHITECTURE.md) and [current feature matrix](v2/FEATURE_MATRIX.md) describe this branch’s implemented behavior and verification.
+
 | Table | Purpose | Important constraints |
 |---|---|---|
 | users | Synthetic identities | unique lowercase email; Argon2id hash |

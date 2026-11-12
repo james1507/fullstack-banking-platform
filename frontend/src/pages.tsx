@@ -179,7 +179,7 @@ export function LoginPage() {
     </main>
   );
 }
-function PageHeading({
+export function PageHeading({
   eyebrow,
   title,
   description,
@@ -218,6 +218,8 @@ export function DashboardPage() {
     );
   const s = summary.data;
   const items = accounts.data || [];
+  if (user?.role === 'OPERATIONS') return <Navigate to="/ops" replace />;
+  if (user?.role === 'AUDITOR') return <Navigate to="/audit" replace />;
   return (
     <>
       <PageHeading
@@ -240,7 +242,12 @@ export function DashboardPage() {
               </span>
               <div>
                 <p>Active accounts</p>
-                <strong>{String(s.account_count).padStart(2, '0')}</strong>
+                <strong>
+                  {String(items.filter((account) => account.status === 'ACTIVE').length).padStart(
+                    2,
+                    '0',
+                  )}
+                </strong>
               </div>
               <span className="stat-label">All in VND</span>
             </div>
@@ -337,8 +344,8 @@ export function AccountsPage() {
         title="Your accounts."
         description="Every balance. Every account. One clear picture."
         action={
-          <Link className="button primary" to="/transfers/new">
-            Move money <ArrowUpRight size={17} />
+          <Link className="button primary" to="/accounts/new">
+            Open demo account <ArrowUpRight size={17} />
           </Link>
         }
       />
@@ -363,7 +370,9 @@ export function AccountsPage() {
                   <strong>{a.account_number}</strong>
                   <code>{a.id}</code>
                 </span>
-                <StatusBadge />
+                <span className="status-badge">
+                  {a.status} · {a.account_type}
+                </span>
               </div>
             ))}
           </section>
@@ -443,6 +452,14 @@ export function HistoryPage() {
   const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.accounts });
   return (
     <>
+      <div className="action-row">
+        <Link className="text-link" to="/transfers/search">
+          Advanced search
+        </Link>
+        <Link className="text-link" to="/statements">
+          Account statements
+        </Link>
+      </div>
       <PageHeading
         eyebrow="EVERY MOVE TELLS A STORY"
         title="Your transactions."
@@ -583,6 +600,9 @@ export function ReceiptPage() {
         <Link className="button primary" to="/transfers/new">
           Make another transfer <ArrowUpRight size={16} />
         </Link>
+        <button className="button secondary" onClick={() => window.print()}>
+          Print receipt
+        </button>
         <Link className="text-link receipt-home" to="/">
           Back to overview
         </Link>

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, restoreSession, setToken, type User } from './lib/api';
 import { ErrorAlert, LoadingSkeleton } from './components/ui';
@@ -77,4 +77,20 @@ export function ProtectedRoute() {
       </main>
     );
   return user ? <Outlet /> : <Navigate to="/login" replace state={{ from: location.pathname }} />;
+}
+
+export function RoleGuard({ roles }: { roles: User['role'][] }) {
+  const { user } = useAuth();
+  return user && roles.includes(user.role) ? (
+    <Outlet />
+  ) : (
+    <section className="panel settings-panel">
+      <span className="eyebrow">403 · ROLE RESTRICTED</span>
+      <h1>Access restricted.</h1>
+      <p>This page is not available for your role.</p>
+      <Link className="button secondary" to="/">
+        Back to workspace
+      </Link>
+    </section>
+  );
 }

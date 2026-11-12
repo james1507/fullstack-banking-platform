@@ -10,6 +10,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeout
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException
 
@@ -17,8 +19,11 @@ from app import repositories, security
 from app.config import settings
 from app.db import get_db
 from app.errors import APIError, api_error, envelope
+from app.inbox_api import router as inbox_router
 from app.models import Transfer, User
+from app.schedule_api import router as schedule_router
 from app.schemas import (
+    MAX_AMOUNT,
     AccountOutput,
     LoginInput,
     TokenOutput,
@@ -27,10 +32,11 @@ from app.schemas import (
     UserOutput,
 )
 from app.transfers import execute_transfer
+from app.v2 import router as v2_router
 
 app = FastAPI(
     title="Moneta · Simulated Banking API",
-    version="1.0.0",
+    version="2.0.0",
     docs_url="/docs" if settings().docs_enabled else None,
     redoc_url=None,
     openapi_url="/openapi.json" if settings().docs_enabled else None,
@@ -39,7 +45,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings().origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
     expose_headers=["X-Request-ID", "X-Idempotency-Replayed"],
 )
@@ -48,7 +54,24 @@ logger = logging.getLogger("banking")
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 DB = Annotated[Session, Depends(get_db)]
 Actor = Annotated[User, Depends(security.current_user)]
+Customer = Annotated[User, Depends(security.require_roles("CUSTOMER"))]
 PREFIX = "/api/v1"
+app.include_router(v2_router)
+app.include_router(schedule_router)
+app.include_router(inbox_router)
+
+
+@app.exception_handler(OperationalError)
+@app.exception_handler(PoolTimeout)
+async def database_unavailable(request: Request, exc: Exception):
+    return JSONResponse(
+        envelope(
+            "SERVICE_UNAVAILABLE",
+            "Database temporarily unavailable. Retry the original request safely.",
+            request.state.request_id,
+        ),
+        status_code=503,
+    )
 
 
 @app.middleware("http")
@@ -124,7 +147,10 @@ def live():
 def ready(db: DB):
     try:
         revision = db.scalar(text("SELECT version_num FROM alembic_version"))
-        if revision != "001":
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+
+        if revision != ScriptDirectory.from_config(Config("alembic.ini")).get_current_head():
             raise ValueError("Migration not ready")
     except Exception as exc:
         raise APIError(503, "NOT_READY", "Database is not ready.") from exc
@@ -198,7 +224,7 @@ def account(account_id: uuid.UUID, user: Actor, db: DB):
 def transfer(
     payload: TransferInput,
     request: Request,
-    user: Actor,
+    user: Customer,
     db: DB,
     idempotency_key: Annotated[str, Header(min_length=8, max_length=100)],
 ):
@@ -248,8 +274,15 @@ def detail(transfer_id: uuid.UUID, user: Actor, db: DB):
 def summary(user: Actor, db: DB):
     rows = repositories.owned_accounts(db, user.id)
     recent, total = repositories.history(db, user.id, page_size=5)
+    total_balance = sum(row.balance_vnd for row in rows)
+    if total_balance > MAX_AMOUNT:
+        raise APIError(
+            422,
+            "AGGREGATE_LIMIT_EXCEEDED",
+            "This V1 summary exceeds the safe integer transport limit.",
+        )
     return {
-        "total_balance_vnd": sum(row.balance_vnd for row in rows),
+        "total_balance_vnd": total_balance,
         "account_count": len(rows),
         "transfer_count": total,
         "recent_transfers": [

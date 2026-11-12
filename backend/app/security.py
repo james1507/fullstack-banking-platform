@@ -93,6 +93,29 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
         return user
 
 
+def require_roles(*roles):
+    def authorize(user: User = Depends(current_user)) -> User:
+        if user.role not in roles:
+            raise APIError(403, "FORBIDDEN", "This action is not available for your role.")
+        return user
+
+    return authorize
+
+
+def limit_recipient_lookup(user: User = Depends(current_user)):
+    # ponytail: process-local authenticated lookup limit; use a shared gateway before scaling.
+    now = time.monotonic()
+    with _attempt_lock:
+        attempts = _attempts[f"recipient:{user.id}"]
+        while attempts and attempts[0] <= now - 60:
+            attempts.popleft()
+        if len(attempts) >= 30:
+            raise APIError(
+                429, "RATE_LIMITED", "Too many recipient lookups. Try again in a minute."
+            )
+        attempts.append(now)
+
+
 def new_refresh(db: Session, user: User, family_id: uuid.UUID | None = None) -> str:
     raw = secrets.token_urlsafe(48)
     db.add(

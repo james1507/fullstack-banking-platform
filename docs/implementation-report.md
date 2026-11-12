@@ -1,5 +1,7 @@
 # Implementation report
 
+> **V1 baseline document.** Preserved for historical context. The [V2 addendum](v2/TEST_REPORT.md) and [current feature matrix](v2/FEATURE_MATRIX.md) describe this branch’s implemented behavior and verification.
+
 Verified locally on 11 November 2026. Source repository: `fullstack-banking-platform`. Product name: Moneta. Banking simulation only.
 
 ## Implementation summary

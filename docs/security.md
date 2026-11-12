@@ -1,5 +1,7 @@
 # Security model
 
+> **V1 baseline document.** Preserved for historical context. The [V2 addendum](v2/SECURITY_THREAT_MODEL.md) and [current feature matrix](v2/FEATURE_MATRIX.md) describe this branch’s implemented behavior and verification.
+
 Simulation only. Do not expose this demo to public traffic with bundled credentials or local secrets.
 
 ## Threats and controls

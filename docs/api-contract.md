@@ -1,5 +1,7 @@
 # HTTP contract
 
+> **V1 baseline document.** Preserved for historical context. The [V2 addendum](v2/API_CONTRACTS.md) and [current feature matrix](v2/FEATURE_MATRIX.md) describe this branch’s implemented behavior and verification.
+
 Interactive OpenAPI: `http://localhost:8000/docs`. Base: `/api/v1`. Amounts and balances are fictional, positive/nonnegative JSON-safe integer VND. Unknown transfer input fields are rejected.
 
 | Method | Route | Success | Notes |

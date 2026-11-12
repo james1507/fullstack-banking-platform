@@ -65,9 +65,15 @@ def assert_integrity(db):
 
 
 def test_health_seed_is_repeatable(client, db):
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
     seed()
     assert client.get("/health/live").status_code == 200
-    assert client.get("/health/ready").json()["migration"] == "001"
+    assert (
+        client.get("/health/ready").json()["migration"]
+        == ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
+    )
     assert db.scalar(select(func.count()).select_from(Account)) == 2
     assert balances(db) == [5_000_000, 3_000_000]
 

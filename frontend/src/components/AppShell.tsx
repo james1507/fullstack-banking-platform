@@ -9,6 +9,10 @@ import {
   LogOut,
   ShieldCheck,
   Sparkles,
+  UsersRound,
+  FileText,
+  CalendarClock,
+  Bell,
 } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth';
@@ -19,13 +23,19 @@ export function AppShell() {
   const { pathname } = useLocation();
   const [error, setError] = useState<unknown>(null);
   const [leaving, setLeaving] = useState(false);
-  const section = pathname.startsWith('/accounts')
-    ? 'Accounts'
-    : pathname.startsWith('/transfers/new')
-      ? 'New transfer'
-      : pathname.startsWith('/transfers')
-        ? 'Transactions'
-        : 'Overview';
+  const section =
+    [
+      ['/accounts', 'Accounts'],
+      ['/transfers/new', 'New transfer'],
+      ['/transfers', 'Transactions'],
+      ['/beneficiaries', 'Recipients'],
+      ['/statements', 'Statements'],
+      ['/scheduled-transfers', 'Schedules'],
+      ['/notifications', 'Inbox'],
+      ['/ops', 'Account controls'],
+      ['/audit', 'Audit trail'],
+      ['/about', 'About'],
+    ].find(([path]) => pathname === path || pathname.startsWith(`${path}/`))?.[1] || 'Overview';
   async function signOut() {
     setLeaving(true);
     try {
@@ -47,15 +57,41 @@ export function AppShell() {
           <NavLink end to="/">
             <LayoutDashboard size={19} /> Overview
           </NavLink>
-          <NavLink to="/accounts">
-            <CreditCard size={19} /> My accounts
-          </NavLink>
-          <NavLink to="/transfers" end>
-            <ArrowLeftRight size={19} /> Transactions
-          </NavLink>
-          <NavLink to="/transfers/new">
-            <ArrowUpRight size={19} /> Send money
-          </NavLink>
+          {user?.role === 'CUSTOMER' && (
+            <>
+              <NavLink to="/accounts">
+                <CreditCard size={19} /> My accounts
+              </NavLink>
+              <NavLink to="/transfers" end>
+                <ArrowLeftRight size={19} /> Transactions
+              </NavLink>
+              <NavLink to="/transfers/new">
+                <ArrowUpRight size={19} /> Send money
+              </NavLink>
+              <NavLink to="/beneficiaries">
+                <UsersRound size={19} /> Recipients
+              </NavLink>
+              <NavLink to="/statements">
+                <FileText size={19} /> Statements
+              </NavLink>
+              <NavLink to="/scheduled-transfers">
+                <CalendarClock size={19} /> Schedules
+              </NavLink>
+              <NavLink to="/notifications">
+                <Bell size={19} /> Inbox
+              </NavLink>
+            </>
+          )}
+          {user?.role === 'OPERATIONS' && (
+            <NavLink to="/ops">
+              <ShieldCheck size={19} /> Account controls
+            </NavLink>
+          )}
+          {user?.role !== 'CUSTOMER' && (
+            <NavLink to="/audit">
+              <ShieldCheck size={19} /> Audit trail
+            </NavLink>
+          )}
         </nav>
         <div className="sidebar-bottom">
           <div className="sandbox-card">
@@ -100,7 +136,7 @@ export function AppShell() {
             <span className="avatar">{user?.display_name.charAt(0)}</span>
             <span className="user-name">
               {user?.display_name}
-              <small>Personal workspace</small>
+              <small>{user?.role === 'CUSTOMER' ? 'Personal workspace' : user?.role}</small>
             </span>
             <ChevronDown className="user-chevron" size={15} />
             <button

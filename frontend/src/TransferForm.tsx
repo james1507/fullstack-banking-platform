@@ -2,8 +2,8 @@ import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, Check, LockKeyhole, UserRound } from 'lucide-react';
 import {
   ALICE_ACCOUNT,
@@ -12,6 +12,7 @@ import {
   BOB_ACCOUNT,
   type Account,
   type TransferInput,
+  type TransferPreview,
 } from './lib/api';
 import { formatVND } from './lib/format';
 import { ErrorAlert } from './components/ui';
@@ -36,7 +37,7 @@ const schema = z
     path: ['destination_account_id'],
   });
 type FormValues = z.infer<typeof schema>;
-type Attempt = { payload: TransferInput; key: string };
+type Attempt = { payload: TransferInput; key: string; preview: TransferPreview };
 
 export function ConfirmTransferDialog({
   attempt,
@@ -54,9 +55,20 @@ export function ConfirmTransferDialog({
       <span className="eyebrow">REVIEW BEFORE SENDING</span>
       <h3>{formatVND(attempt.payload.amount_vnd)}</h3>
       <p>
-        To <code>{attempt.payload.destination_account_id}</code>
+        From {attempt.preview.source_name} · {attempt.preview.source_number}
+      </p>
+      <p>
+        To <strong>{attempt.preview.destination_masked_number}</strong>
       </p>
       <p>{attempt.payload.memo || 'No memo added'}</p>
+      <p>
+        No transfer fee. Estimated source balance after sending:{' '}
+        <strong>{formatVND(attempt.preview.estimated_balance_vnd)}</strong>.
+      </p>
+      <small>
+        Checked with the server. Balance, account status and limits are checked again when you
+        confirm.
+      </small>
       <div className="flex gap-3">
         <button className="button secondary" disabled={pending} onClick={cancel}>
           Back to edit
@@ -71,25 +83,37 @@ export function ConfirmTransferDialog({
 export function TransferForm({ accounts }: { accounts: Account[] }) {
   const navigate = useNavigate();
   const cache = useQueryClient();
+  const [params] = useSearchParams();
+  const eligible = accounts.filter((account) => account.status === 'ACTIVE');
+  const recipients = useQuery({ queryKey: ['beneficiaries'], queryFn: () => api.beneficiaries() });
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [uncertain, setUncertain] = useState(false);
   const guard = useRef(false);
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      source_account_id: accounts[0]?.id || '',
-      destination_account_id: '',
+      source_account_id:
+        eligible.find((account) => account.id === params.get('source'))?.id ||
+        eligible[0]?.id ||
+        '',
+      destination_account_id: z.string().uuid().safeParse(params.get('recipient')).success
+        ? params.get('recipient')!
+        : '',
       amount: '',
       memo: '',
     },
+  });
+  const preview = useMutation({
+    mutationFn: api.previewTransfer,
+    onSuccess: (data, payload) => setAttempt({ payload, key: crypto.randomUUID(), preview: data }),
   });
   const mutation = useMutation({
     mutationFn: (a: Attempt) => api.transfer(a.payload, a.key),
     retry: false,
     onSuccess: async (t) => {
       await Promise.all(
-        ['accounts', 'summary', 'history'].map((key) =>
-          cache.invalidateQueries({ queryKey: [key] }),
+        ['accounts', 'account', 'summary', 'history', 'statement', 'beneficiaries', 'inbox'].map(
+          (key) => cache.invalidateQueries({ queryKey: [key] }),
         ),
       );
       navigate(`/transfers/${t.id}`, { state: { fresh: true } });
@@ -103,18 +127,15 @@ export function TransferForm({ accounts }: { accounts: Account[] }) {
       guard.current = false;
     },
   });
-  const locked = mutation.isPending || uncertain || attempt !== null;
+  const locked = mutation.isPending || preview.isPending || uncertain || attempt !== null;
   const source = accounts.find((a) => a.id === form.watch('source_account_id'));
   function review(values: FormValues) {
     mutation.reset();
-    setAttempt({
-      key: crypto.randomUUID(),
-      payload: {
-        source_account_id: values.source_account_id,
-        destination_account_id: values.destination_account_id,
-        amount_vnd: Number(values.amount.replaceAll(',', '')),
-        memo: values.memo.trim() || null,
-      },
+    preview.mutate({
+      source_account_id: values.source_account_id,
+      destination_account_id: values.destination_account_id,
+      amount_vnd: Number(values.amount.replaceAll(',', '')),
+      memo: values.memo.trim() || null,
     });
   }
   function send() {
@@ -156,7 +177,7 @@ export function TransferForm({ accounts }: { accounts: Account[] }) {
                       ? 'source_account_id-error'
                       : 'source-balance'
                   }
-                  options={accounts.map((a) => ({
+                  options={eligible.map((a) => ({
                     value: a.id,
                     label: `${a.name} · ${a.account_number}`,
                     description: `${formatVND(a.balance_vnd)} available · VND account`,
@@ -177,6 +198,38 @@ export function TransferForm({ accounts }: { accounts: Account[] }) {
               <h3>Who are you sending to?</h3>
               <p>Only fictional accounts in this demo.</p>
             </div>
+          </div>
+          <div className="field">
+            <div className="label-row">
+              <label htmlFor="saved-recipient">Saved recipient</label>
+              <Link className="text-link" to="/beneficiaries">
+                Manage recipients
+              </Link>
+            </div>
+            <Select
+              id="saved-recipient"
+              disabled={locked}
+              value={
+                recipients.data?.find(
+                  (row) => row.destination_account_id === form.watch('destination_account_id'),
+                )?.id || ''
+              }
+              onChange={(value) =>
+                form.setValue(
+                  'destination_account_id',
+                  recipients.data?.find((row) => row.id === value)?.destination_account_id || '',
+                  { shouldValidate: true },
+                )
+              }
+              options={[
+                { value: '', label: 'Enter an account ID manually' },
+                ...(recipients.data || []).map((row) => ({
+                  value: row.id,
+                  label: row.nickname,
+                  description: `Fictional account · ${row.destination_account_id.slice(-6)}`,
+                })),
+              ]}
+            />
           </div>
           <div className="field">
             <div className="label-row">
@@ -249,8 +302,9 @@ export function TransferForm({ accounts }: { accounts: Account[] }) {
             <span>
               <LockKeyhole size={14} /> Secure, simulated transfer
             </span>
-            <button className="button primary" disabled={locked || !accounts.length}>
-              Review transfer <ArrowRight size={16} />
+            <button className="button primary" disabled={locked || !eligible.length}>
+              {preview.isPending ? 'Checking transfer…' : 'Review transfer'}{' '}
+              <ArrowRight size={16} />
             </button>
           </div>
         </fieldset>
@@ -263,12 +317,18 @@ export function TransferForm({ accounts }: { accounts: Account[] }) {
           cancel={() => setAttempt(null)}
         />
       )}
-      {mutation.error && <ErrorAlert error={mutation.error} />}
+      {(mutation.error || preview.error) && <ErrorAlert error={mutation.error || preview.error} />}
+      {!eligible.length && (
+        <p role="status">No active source accounts. Frozen and closed accounts cannot send.</p>
+      )}
+      {recipients.error && (
+        <ErrorAlert error={recipients.error} retry={() => void recipients.refetch()} />
+      )}
       {uncertain && (
         <div className="retry-panel">
           <p>
-            Outcome not yet confirmed. Your original amount, recipient and request key are
-            preserved.
+            Status unknown — check transaction history or retry safely. Your original amount,
+            recipient and request key are preserved.
           </p>
           <button className="button primary" disabled={mutation.isPending} onClick={send}>
             {mutation.isPending ? 'Checking…' : 'Retry original transfer'} <Check size={16} />
